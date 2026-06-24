@@ -1,0 +1,7 @@
+.env
+uploads/
+extracted_frames/
+venv/
+__pycache__/
+*.pyc
+*.pyo
