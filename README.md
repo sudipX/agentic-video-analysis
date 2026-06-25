@@ -1,6 +1,6 @@
 # Agentic Video Analysis System
 
-A stateful agentic pipeline that processes video through conditional computer vision steps and produces a structured natural-language report of what happened — built with LangGraph, OpenCV, and YOLOv8, running fully locally via Ollama.
+A stateful agentic pipeline that processes video through conditional computer vision steps and produces a structured natural-language report of what happened, built with LangGraph, OpenCV, and YOLOv8, running fully locally via Ollama.
 
 ---
 
@@ -10,11 +10,11 @@ Given a video file, the system:
 
 1. Samples frames at a fixed rate (1 fps by default)
 2. Detects motion between consecutive frames using frame differencing
-3. **Only runs object detection on frames where motion was found** — skipping expensive YOLO inference on static segments entirely
-4. Identifies objects in motion frames (person, car, bicycle, dog — 80 COCO classes)
+3. **Only runs object detection on frames where motion was found** : skipping expensive YOLO inference on static segments entirely
+4. Identifies objects in motion frames (person, car, bicycle, dog : 80 COCO classes)
 5. Converts the structured detections into a natural-language summary and a timestamped JSON list of key moments
 
-The conditional routing — run YOLO or skip it based on what the motion detector found — is a real agentic decision made at runtime by the LangGraph state machine, not a hardcoded if/else in a script.
+The conditional routing : run YOLO or skip it based on what the motion detector found, is a real agentic decision made at runtime by the LangGraph state machine, not a hardcoded if/else in a script.
 
 Tested on real video footage: the system correctly identified motion timestamps, detected objects per frame, and produced a coherent narrative summary without human intervention.
 
@@ -27,7 +27,7 @@ Video Input
     │
     ▼
 ┌─────────────────┐
-│ Frame Extractor │  OpenCV — sample 1 frame/sec, save to disk
+│ Frame Extractor │  OpenCV : sample 1 frame/sec, save to disk
 └────────┬────────┘
          │
          ▼
@@ -41,15 +41,15 @@ Video Input
     │          │
     ▼          │
 ┌──────────────────┐  │
-│ Object Detector  │  │  YOLOv8n — 80-class detection
+│ Object Detector  │  │  YOLOv8n : 80-class detection
 │    (YOLO)        │  │  Skipped entirely if no motion
 └────────┬─────────┘  │
          └────┬────────┘
               │
               ▼
 ┌──────────────────┐
-│   Summarizer     │  Ollama (llama3.2:3b) — structured
-│                  │  CV output → natural language
+│   Summarizer     │  Ollama (llama3.2:3b) : structured
+│                  │  CV output -> natural language
 └────────┬─────────┘
          │
          ▼
@@ -60,7 +60,7 @@ Video Input
 
 **Each box is a LangGraph node. Each arrow is an edge. The motion branch is a conditional edge decided at runtime.**
 
-Any node can fail and retry up to 3 times before the pipeline gracefully produces a partial report — implemented as a decorator wrapping risky nodes, not manual try/except at every call site.
+Any node can fail and retry up to 3 times before the pipeline gracefully produces a partial report : implemented as a decorator wrapping risky nodes, not manual try/except at every call site.
 
 ---
 
@@ -158,7 +158,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8001
 
 ## Using the API
 
-This API uses a **submit-and-poll** pattern. Video analysis can take minutes — the server accepts your video immediately and returns a job ID. You poll separately to retrieve the result.
+This API uses a **submit-and-poll** pattern. Video analysis can take minutes : the server accepts your video immediately and returns a job ID. You poll separately to retrieve the result.
 
 ### Option A — Interactive UI
 
@@ -269,32 +269,32 @@ def frame_extractor_node(state: dict) -> dict:
 
 If a node raises an exception, instead of crashing the graph, the decorator catches it, writes the error to `state["error_message"]`, and increments `state["retry_count"]`. The graph then routes to a check function that decides: retry the node, or give up and route to `report_writer` with `failed=True`.
 
-This means even failed analyses produce a structured response — a partial report with `"analysis_failed": true` — rather than a hung job or an unhandled 500.
+This means even failed analyses produce a structured response : a partial report with `"analysis_failed": true` — rather than a hung job or an unhandled 500.
 
 ---
 
 ## Design Decisions
 
-**Why motion gating before YOLO?** YOLOv8 inference costs real compute per frame. Frame differencing with Gaussian blur costs almost nothing. For a 60-second video at 30fps with 20 seconds of actual activity, motion gating means YOLO only processes ~20 frames instead of 1800. The motion threshold (2% of pixels changed) is tunable and documented as a deliberate tradeoff — lower catches more activity, higher is more noise-resistant.
+**Why motion gating before YOLO?** YOLOv8 inference costs real compute per frame. Frame differencing with Gaussian blur costs almost nothing. For a 60-second video at 30fps with 20 seconds of actual activity, motion gating means YOLO only processes ~20 frames instead of 1800. The motion threshold (2% of pixels changed) is tunable and documented as a deliberate tradeoff, lower catches more activity, higher is more noise-resistant.
 
-**Why frame differencing instead of optical flow?** Optical flow (including RAFT, which I implemented from scratch separately) gives richer per-pixel motion vectors — direction, magnitude — but is an order of magnitude slower. For a binary "did something move?" gate before YOLO, frame differencing provides the necessary signal at a fraction of the compute cost. Optical flow would be the right swap if the use case shifted to requiring motion direction or speed (traffic speed estimation, for example).
+**Why frame differencing instead of optical flow?** Optical flow (including RAFT, which I implemented from scratch separately) gives richer per-pixel motion vectors : direction, magnitude, but is an order of magnitude slower. For a binary "did something move?" gate before YOLO, frame differencing provides the necessary signal at a fraction of the compute cost. Optical flow would be the right swap if the use case shifted to requiring motion direction or speed (traffic speed estimation, for example).
 
-**Why LangGraph instead of a plain script?** A script has control flow baked into source code. LangGraph has control flow as data — nodes, edges, and routing functions that can be inspected, tested, and modified independently. The conditional skip, the retry logic, and the error recovery would each require nested if/else and manual state threading in a plain script. In LangGraph they are each one declarative `add_conditional_edges` call.
+**Why LangGraph instead of a plain script?** A script has control flow baked into source code. LangGraph has control flow as data : nodes, edges, and routing functions that can be inspected, tested, and modified independently. The conditional skip, the retry logic, and the error recovery would each require nested if/else and manual state threading in a plain script. In LangGraph they are each one declarative `add_conditional_edges` call.
 
-**Why the submit-and-poll pattern?** A synchronous `/analyze` endpoint that blocks until the LangGraph agent finishes would time out for any video longer than ~30 seconds — most web servers and load balancers enforce 30–60 second request timeouts. `BackgroundTasks` + job polling decouples the HTTP layer from processing time entirely.
+**Why the submit-and-poll pattern?** A synchronous `/analyze` endpoint that blocks until the LangGraph agent finishes would time out for any video longer than ~30 seconds, most web servers and load balancers enforce 30–60 second request timeouts. `BackgroundTasks` + job polling decouples the HTTP layer from processing time entirely.
 
 ---
 
 ## Real-World Applications
 
-This architecture — cheap motion filtering as a first-pass gate before expensive object detection — is the core pattern behind:
+This architecture : cheap motion filtering as a first-pass gate before expensive object detection, is the core pattern behind:
 
 - **Post-event security footage review:** produce a timestamped narrative of what happened without watching every minute of footage
 - **Wildlife camera trap analysis:** filter hours of empty footage before running detection on frames with actual animals
 - **Sports and training video review:** automatically identify periods of activity vs. static breaks
 - **Manufacturing pipeline monitoring:** detect when something moved that shouldn't have
 
-Extending to live-stream processing would require replacing the batch video file input with a streaming frame source — the per-frame logic (motion → YOLO → summarize) carries over directly.
+Extending to live-stream processing would require replacing the batch video file input with a streaming frame source, the per-frame logic (motion → YOLO → summarize) carries over directly.
 
 ---
 
